@@ -1,5 +1,11 @@
 import os
 import subprocess
+import tempfile
+
+import torch
+import numpy as np
+
+from tqdm import tqdm
 
 from Bio import SeqIO
 
@@ -9,50 +15,100 @@ def remove_redundancy(input_fasta, output_fasta, redundancy):
         "cd-hit",
         "-i", input_fasta,
         "-o", output_fasta,
-        "-c", redundancy
+        "-c", str(redundancy/100)
     ]
     subprocess.run(cd_hit_command)
-    print(f"cd-hit redandant completed, saves to {output_fasta}")
+    print(f"cd-hit redandancy removing completed. Saved to {output_fasta}")
 
-def length_filter(min, max, input_fasta, output_fasta):
-    sequences = list(SeqIO.parse(input_fasta, "fasta"))
-    filtered_sequences = [record for record in sequences if min <= len(record.seq) <= max]
-    num_filtered_sequences = len(filtered_sequences)
+def length_filter(min, max, input_fasta):
+    output_fasta = input_fasta.split('.')[0] + "_" + str(min) + "to" + str(max) + ".fasta"
+
     with open(output_fasta, 'w') as output_handle:
-        for record in filtered_sequences:
-            header = f">{record.description}\n"
-            sequence = str(record.seq) + "\n"
-            output_handle.write(header)
-            output_handle.write(sequence)
+        num_filtered_sequences = 0
+        for record in SeqIO.parse(input_fasta, "fasta"):
+            if min <= len(record.seq) <= max:
+                num_filtered_sequences += 1
+                header = f">{record.description}\n"
+                sequence = str(record.seq) + "\n"
+                output_handle.write(header)
+                output_handle.write(sequence)
 
-    print(f"length filter completed, saves to {output_fasta}\n {num_filtered_sequences} sequences left.")
+    print(f"length filter completed. Saved to {output_fasta}\n{num_filtered_sequences} sequences left.")
 
-def read_and_pad(file_fasta, max_length=512):
-    # save to origin file
-    sequences = []
-    for record in SeqIO.parse(file_fasta, "fasta"):
-        seq = str(record.seq)
+def read_and_pad(sequences, max_length):
+    # will be called by onehot_encoder
+    new_seqs = []
+    for seq in sequences:
         # padding to maximum length of dataset, use '*' as padding signal
         if len(seq) < max_length:
             seq += '*' * (max_length - len(seq))
-        sequences.append(seq[:max_length])
-    return sequences
+        new_seqs.append(seq[:max_length])
 
-def onehot_encoder(input_fasta, output_fasta):
-    encoding = {''}
+    return new_seqs
 
+def onehot_encoder(input_fasta):
+    # padding
+    sequences = []
+    for record in SeqIO.parse(input_fasta, "fasta"):
+        seq = str(record.seq)
+        sequences.append(seq)
 
+    max_length = max([len(s) for s in sequences])
+    sequences = read_and_pad(sequences, max_length)
+    print("end of padding")
 
+    # store in temple file
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        temp_filename = temp_file.name
+        for seq in sequences:
+            temp_file.write((seq + '\n').encode())
+
+    # one-hot encoder
+    encoding = {
+        "A": [1, 0, 0, 0, 0],
+        "T": [0, 1, 0, 0, 0],
+        "G": [0, 0, 1, 0, 0],
+        "C": [0, 0, 0, 1, 0],
+        "N": [0.5, 0.5, 0.5, 0.5, 0],
+        "*": [0, 0, 0, 0, 1],  # padding symbol
+    }
+    onehot = np.zeros((len(sequences), max_length, 5), dtype=np.float32)
+    print("onehot matrix created.")
+
+    with open(temp_filename, 'r') as temp_file:
+        for i, line in tqdm(enumerate(temp_file), total=len(sequences)):
+            s = line.strip()
+            for j, el in enumerate(s):
+                onehot[i, j] = encoding[el]
+    os.remove(temp_filename)
+
+    ohe_tensor = torch.tensor(onehot, dtype=torch.float32)
+    ohe_trans_tensor = torch.transpose(ohe_tensor, 1, 2)
+    print(ohe_trans_tensor.shape)
+    # save to file
+    dir = os.path.dirname(input_fasta)
+    filename = os.path.basename(input_fasta)
+    output_pt = dir + "/ohe_" + filename.split('.')[0] + ".pt"
+    print(output_pt)
+    torch.save(ohe_trans_tensor, output_pt)
+
+    print(f"onehot encoding completed. Saved to {output_pt}.\n{len(sequences)} sequences left.")
 
 if __name__ == "__main__":
+    root = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.dirname(root) + "/data/"
+
     # remove redundancy
-    sims = [80, 90]
-    for sim in sims:
+#     sims = [80, 90]
+#     for sim in sims:
+#         remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+".fasta", redundancy=sim)
+    
+    # length filter
+#     length_filter(64, 128, data_dir+"5utr_95.fasta")
 
-        root = os.path.dirname(os.path.abspath(__file__))
-        data_dir = os.path.dirname(root) + "/data/"
-
-        remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+".fasta", redundancy=str(sim/100))
+    # onehot encoder
+    onehot_encoder(data_dir+"5utr_95_64to128.fasta")
+    
 
 
 

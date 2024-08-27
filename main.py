@@ -1,11 +1,8 @@
-import warnings
-import argparse, os, sys
+import argparse, os
 import yaml
 
 from config import ConfigLoader
 import src.sessions.utr5_unet1dmodel as utr5_unet1dmodel
-
-
 
 def build_parser():
     parser = argparse.ArgumentParser()

@@ -45,7 +45,7 @@ under construction
 # Utils
 ## data_preprocess.py
 
-<>_full.fasta -(`remove_redundancy`)-> <>_redundancy.fasta -(`length_filter`)-> <>_redundancy_lbtoUb.fasta -(`read_and_pad`)-> <>_redundancy_lbtoUb.fasta -(`onehot_encoder`)-> <>_redundancy_lbtoUb.pt
+<>_full.fasta -(`remove_redundancy`)-> <>_redundancy.fasta -(`length_filter`)-> <>_redundancy_lbtoUb.fasta -(`read_and_pad`)-> <>_redundancy_lbtoUb.fasta -(`onehot_encoder`)-> ohe_<>_redundancy_lbtoUb.pt
 
 
 the final .pt file will contain tensor of one-hoe-encoded sequences.

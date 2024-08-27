@@ -1,5 +1,5 @@
 loader_cfg:
-  data_name: '5utr_95.pt'
+  data_name: 'ohe_5utr_95_64to128.pt'
   batch: 64
   train_prop: 0.8
   shuffle: true

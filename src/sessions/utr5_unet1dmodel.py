@@ -8,8 +8,8 @@ from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 
 from torch.utils.data import DataLoader, TensorDataset
-import wandb
 from tqdm import tqdm
+import wandb
 
 from ..models.utr.unet import UNet1DWithSoftmax
 
@@ -37,7 +37,7 @@ def build_model(config):
     total_params = sum(p.numel() for p in model.parameters())
 
     print(f"=== model build completed. ===")
-    print(f"Model:\n {model}\n\n Total number of parameters:{total_params}")
+    print(f"Total number of parameters:{total_params}")
     return model.to(config.device)
 
 def build_scheduler(config):
@@ -57,102 +57,114 @@ def build_scheduler(config):
 def build_optimizer(model, config):
 
     if config.optimizer == 'AdamW':
-        optimizer = optim.AdamW(model.parameters(), lr=config.lr)
+        optimizer = optim.AdamW(model.parameters(), lr=float(config.lr))
     else:
-        optimizer = optim.AdamW(model.parameters(), lr=config.lr)
+        optimizer = optim.AdamW(model.parameters(), lr=float(config.lr))
         warnings.warn("not sopported optimizer, using AdamW instead.")
 
     print(f"=== optimizer build completed. ===")
-    print(f"Scheduler: {config.optimizer}")
+    print(f"optimizer: {config.optimizer}")
     return optimizer
+
+def build_wandb_logger(config):
+    config_dict = config.__dict__
+    run = wandb.init(
+        project = "5utr-UNet1DModel",
+        config = config_dict,
+    )
+    wandb.require("core")
+    
+    wandb.define_metric("global_step")  # every batch
+    wandb.define_metric("epoch")
+    wandb.define_metric("train_loss/batch", step_metric="global_step")
+    wandb.define_metric("lr/batch", step_metric="global_step")
+    wandb.define_metric("train_loss/epoch", step_metric="epoch")
+    wandb.define_metric("test_loss/epoch", step_metric="epoch")
+    return run
 
 def train(config):
     TIME = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     device = config.device
-    with wandb.init():
-        # components
-        train_dataloader, val_dataloader = build_dataloader(config)
-        model = build_model(config)
-        optimizer = build_optimizer(model, config)
-        scheduler = build_scheduler(config)
+    
+    # components
+    train_dataloader, val_dataloader = build_dataloader(config)
+    model = build_model(config)
+    optimizer = build_optimizer(model, config)
+    scheduler = build_scheduler(config)
+    criterion = torch.nn.MSELoss()
 
-        # wandb logger settings
-        wandb.define_metric("global_step")  # every batch
-        wandb.define_metric("epoch")
-        wandb.define_metric("train_loss/batch", step_metric="global_step")
-        wandb.define_metric("lr/batch", step_metric="global_step")
-        wandb.define_metric("train_loss/epoch", step_metric="epoch")
-        wandb.define_metric("test_loss/epoch", step_metric="epoch")
+    # logger
+    run = build_wandb_logger(config)
 
-        global_step = 0  # for wandb log
-        best_val_loss = float('inf')
-        for epoch in range(config.epoch):
-            print(f"=== training epochs: {epoch+1}/{config.epoch} ===")
-            model.train()  # switch to train mode
-            train_loss_list = []
-            for batch in tqdm(train_dataloader, desc=f"Training Epoch {epoch+1}/{config.epoch}", leave=False):
-                batch = batch[0]
-                clean_data = batch.to(device)
+    global_step = 0  # for wandb log
+    best_val_loss = float('inf')
+    for epoch in range(config.epoch):
+        print(f"=== training epochs: {epoch+1}/{config.epoch} ===")
+        model.train()  # switch to train mode
+        train_loss_list = []
+        for batch in tqdm(train_dataloader, desc=f"Training Epoch {epoch+1}/{config.epoch}", leave=False):
+            batch = batch[0]
+            clean_data = batch.to(device)
 
-                # sample noise to add to the sequences
-                noise = torch.randn_like(batch).to(device)
-                
-                # sample a random timestep for each sequence
-                timesteps = torch.randint(
-                    0, scheduler.num_train_timesteps, (batch.size(0),), device=device
-                ).long()
-
-                # add noise to the clean sequences
-                noisy_seq = scheduler.add_noise(clean_data, noise, timesteps)
-
-                # predict the noise added by scheduler
-                noise_pred = model(noisy_seq, timesteps, return_dict=False)
-                loss = torch.nn.MSELoss(noise_pred, noise)
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-
-                # logs
-                train_loss_list.append(loss.mean().item())
-                global_step += config.batch
-                wandb.log({"train_loss/batch": loss.item(), "lr": config.lr, "global_step": global_step})
-
-            # end of one epoch (all data has been used to train model once)
-            ## evalueation
-            model.eval()
-            with torch.no_grad():
-                val_loss_list = []
-                for val_batch in val_dataloader:
-                    val_batch = val_batch[0]
-                    clean_data = val_batch.to(device)
-                    val_noise = torch.randn_like(val_batch).to(device)
-                    val_timesteps = torch.randint(
-                        0, scheduler.num_train_timesteps, (val_batch.size(0),), device=device
-                    ).long()
-                    val_noisy_seq = scheduler.add_noise(clean_data, val_noise, val_timesteps)
-
-                    val_noise_pred = model(val_noisy_seq, val_timesteps, return_dict=False)
-                    val_loss = torch.nn.MSELoss(val_noise_pred, val_noise)
-
-                    val_loss_list.append(val_loss.mean().item())
-
-                # log epoch results
-                train_loss = sum(train_loss_list) / len(train_loss_list)
-                val_loss = sum(val_loss_list) / len(val_loss_list)
-                wandb.log({"train_loss/epoch": train_loss, "test_loss/epoch": val_loss, "epoch": epoch})
-
-                # save the best model for now
-                if val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    torch.save(model.state_dict(), os.path.join(config.save_path, TIME+f"_best_unet1dmodel.pt"))
+            # sample noise to add to the sequences
+            noise = torch.randn_like(batch).to(device)
             
-            # model log
-            if epoch % config.save_model_epochs == 0 and epoch != 0:
-                pt_file = os.path.join(config.save_path, TIME+f"_diffusion_unet_epoch_{epoch}.pt")
-                torch.save(model.state_dict(), pt_file)
-                
-        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_unet_model.pt"))
+            # sample a random timestep for each sequence
+            timesteps = torch.randint(
+                0, scheduler.config.num_train_timesteps, (batch.size(0),), device=device
+            ).long()
+
+            # add noise to the clean sequences
+            noisy_seq = scheduler.add_noise(clean_data, noise, timesteps)
+
+            # predict the noise added by scheduler
+            noise_pred = model(noisy_seq, timesteps, return_dict=False)
+            loss = criterion(noise_pred, noise)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # logs
+            train_loss_list.append(loss.mean().item())
+            global_step += config.batch
+            wandb.log({"train_loss/batch": loss.item(), "lr": float(config.lr), "global_step": global_step})
+
+        # end of one epoch (all data has been used to train model once)
+        ## evalueation
+        model.eval()
+        with torch.no_grad():
+            val_loss_list = []
+            for val_batch in val_dataloader:
+                val_batch = val_batch[0]
+                clean_data = val_batch.to(device)
+                val_noise = torch.randn_like(val_batch).to(device)
+                val_timesteps = torch.randint(
+                    0, scheduler.config.num_train_timesteps, (val_batch.size(0),), device=device
+                ).long()
+                val_noisy_seq = scheduler.add_noise(clean_data, val_noise, val_timesteps)
+
+                val_noise_pred = model(val_noisy_seq, val_timesteps, return_dict=False)
+                val_loss = criterion(val_noise_pred, val_noise)
+
+                val_loss_list.append(val_loss.mean().item())
+
+            # log epoch results
+            train_loss = sum(train_loss_list) / len(train_loss_list)
+            val_loss = sum(val_loss_list) / len(val_loss_list)
+            wandb.log({"train_loss/epoch": train_loss, "test_loss/epoch": val_loss, "epoch": epoch})
+
+            # save the best model for now
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                torch.save(model.state_dict(), os.path.join(config.save_path, TIME+f"_best_unet1dmodel.pt"))
+        
+        # model log
+        if epoch % config.save_model_epochs == 0 and epoch != 0:
+            pt_file = os.path.join(config.save_path, TIME+f"_diffusion_unet_epoch_{epoch}.pt")
+            torch.save(model.state_dict(), pt_file)
+            
+    torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_unet_model.pt"))
             
     # clean cuda memory
     del model
