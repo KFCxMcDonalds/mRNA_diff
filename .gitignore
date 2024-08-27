@@ -4,3 +4,7 @@ src/models/5UTR/.ipynb_checkpoints
 src/models/5UTR/save_models
 src/models/5UTR/wandb
 src/models/5UTR/5utr_95.pt
+__pycache__
+src/models/utr/save_models
+src/models/utr/wandb
+wandb

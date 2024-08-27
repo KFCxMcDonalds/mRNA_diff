@@ -1,0 +1,27 @@
+loader_cfg:
+  data_name: '5utr_95.pt'
+  batch: 64
+  train_prop: 0.8
+  shuffle: true
+  seed: 2024
+
+logger_cfg:
+  save_model_epochs: 10 
+  save_path: '/save_models/5utr/'
+
+trainer_cfg:
+  epoch: 100 
+  lr: 1e-5
+  lr_warmup_steps: 5000
+  optimizer: "AdamW"
+
+model_cfg:
+  scheduler: "DDPM"
+  num_train_timesteps: 1000
+  input_length: 512
+  in_channels: 5
+  out_channels: 5
+  layers_per_block: 4
+  block_out_channels: [256, 256, 512, 512]  # 4 blocks each side
+  down_block_types: ["DownBlock1D", "DownBlock1D", "AttnDownBlock1D", "DownBlock1D"]
+  up_block_types: ["UpBlock1D", "AttnUpBlock1D", "UpBlock1D", "UpBlock1D"]

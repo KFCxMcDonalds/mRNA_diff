@@ -1,0 +1,55 @@
+program: 5utr_UNet1DModel_sweep.py
+name: 5utr_UNet1DModel_sweep
+description: "sweep for 5utr generation model with UNet1DModel as the architecture."
+method: bayes  # grid/random
+metric:
+  name: 'test_loss/epoch'
+  goal: minimize
+parameters:
+  # dataloader
+  data_path: 
+    values: 5utr_95_sweep.pt
+  batch:
+    value: 64
+  train_prop:
+    value: 0.8
+  shuffle: 
+    value: true
+
+  # model
+  input_length:
+    value: 512
+  in_channels:
+    value: 5
+  out_channels:
+    value: 5
+  layers_per_block:
+    values: [2, 4, 6, 8]
+  block_out_channels:
+    values: [[256, 256, 512, 512], [128, 256, 512], [16, 64, 128], [16, 32, 64], [64, 128, 256], [64, 64, 64],[16, 16, 16], [256, 256, 256]]
+  down_block_types: 
+    values: [["DownBlock1D", "DownBlock1D", "AttnDownBlock1D", "DownBlock1D"], ["DownBlock1D", "AttnDownBlock1D", "DownBlock1D"], ["DownBlock1D", "DownBlock1D", "DownBlock1D"], ['AttnDownBlock1D', "DownBlock1D", "DownBlock1D"], ["DownBlock1D", "DownBlock1D", "AttnDownBlock1D"]]
+  up_block_types:
+    values: [["UpBlock1D", "AttnUpBlock1D", "UpBlock1D", "UpBlock1D"], ["UpBlock1D", "AttnUpBlock1D", "UpBlock1D"], ["UpBlock1D", "UpBlock1D", "UpBlock1D"], ['AttnUpBlock1D', "UpBlock1D", "UpBlock1D"], ["AttnUpBlock1D", "UpBlock1D", "UpBlock1D"]]
+
+    # train
+  scheduler:
+    values: ["DDPM", "DDIM"]
+  num_train_timesteps:
+    values: [1000, 100]
+  opeimizer:
+    value: AdamW
+  lr:
+    values: [1e-3, 1e-4, 1e-5, 1e-6]
+  epoch:
+    value: 3
+
+  # log
+  save_model_epochs:
+    value: 100  # not save 
+  save_path:
+    value: "./save_models"
+  
+  seed:
+    value: 2024
+run_cap: 100
