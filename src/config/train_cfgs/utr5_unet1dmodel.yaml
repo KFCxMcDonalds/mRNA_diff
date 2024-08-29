@@ -6,6 +6,7 @@ loader_cfg:
   seed: 2024
 
 logger_cfg:
+  save_flag: true
   save_model_epochs: 10 
   save_path: '/save_models/5utr/'
 
@@ -18,7 +19,7 @@ trainer_cfg:
 model_cfg:
   scheduler: "DDPM"
   num_train_timesteps: 1000
-  input_length: 512
+  input_length: 128
   in_channels: 5
   out_channels: 5
   layers_per_block: 4

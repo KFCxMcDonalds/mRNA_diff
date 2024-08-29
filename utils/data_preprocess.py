@@ -20,6 +20,23 @@ def remove_redundancy(input_fasta, output_fasta, redundancy):
     subprocess.run(cd_hit_command)
     print(f"cd-hit redandancy removing completed. Saved to {output_fasta}")
 
+def cleaner(input_fasta):
+    # save to origin file
+    with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
+        for record in SeqIO.parse(input_fasta, "fasta"):
+            if all(base in "ATCG" for base in record.seq.upper()):
+                header = f">{record.description}\n"
+                sequence = str(record.seq) + "\n"
+                temp_file.write(header)
+                temp_file.write(sequence)
+        
+        temp_file_name = temp_file.name
+    
+    os.replace(temp_file_name, input_fasta)
+
+    print("sequences with nucleotides other than ATCG has been deleted.")
+
+
 def length_filter(min, max, input_fasta):
     output_fasta = input_fasta.split('.')[0] + "_" + str(min) + "to" + str(max) + ".fasta"
 
@@ -69,7 +86,6 @@ def onehot_encoder(input_fasta):
         "T": [0, 1, 0, 0, 0],
         "G": [0, 0, 1, 0, 0],
         "C": [0, 0, 0, 1, 0],
-        "N": [0.5, 0.5, 0.5, 0.5, 0],
         "*": [0, 0, 0, 0, 1],  # padding symbol
     }
     onehot = np.zeros((len(sequences), max_length, 5), dtype=np.float32)
@@ -103,8 +119,11 @@ if __name__ == "__main__":
 #     for sim in sims:
 #         remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+".fasta", redundancy=sim)
     
+    # sequences clean: unknown nucleotides except ATCG
+    cleaner(data_dir+ "5utr_95.fasta")
+
     # length filter
-#     length_filter(64, 128, data_dir+"5utr_95.fasta")
+    length_filter(64, 128, data_dir+"5utr_95.fasta")
 
     # onehot encoder
     onehot_encoder(data_dir+"5utr_95_64to128.fasta")

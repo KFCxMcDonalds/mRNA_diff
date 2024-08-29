@@ -15,3 +15,5 @@ class ConfigLoader():
                 self.__setattr__(attr, value)
 
 
+class SweepConfigLoader():
+    pass

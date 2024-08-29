@@ -2,16 +2,16 @@ import os, warnings, datetime
 
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, random_split, TensorDataset
 
 from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 
-from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import wandb
 
-from ..models.utr.unet import UNet1DWithSoftmax
+from ..models.utr.unet import UNet1D
 
 def build_dataloader(config):
     # load from pt file
@@ -33,7 +33,7 @@ def build_dataloader(config):
     
 def build_model(config):
 
-    model = UNet1DWithSoftmax(config)
+    model = UNet1D(config)
     total_params = sum(p.numel() for p in model.parameters())
 
     print(f"=== model build completed. ===")
@@ -68,11 +68,11 @@ def build_optimizer(model, config):
 
 def build_wandb_logger(config):
     config_dict = config.__dict__
+    wandb.require("core")
     run = wandb.init(
         project = "5utr-UNet1DModel",
         config = config_dict,
     )
-    wandb.require("core")
     
     wandb.define_metric("global_step")  # every batch
     wandb.define_metric("epoch")
@@ -83,6 +83,8 @@ def build_wandb_logger(config):
     return run
 
 def train(config):
+    torch.manual_seed(config.seed)
+
     TIME = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
     device = config.device
     
@@ -91,7 +93,7 @@ def train(config):
     model = build_model(config)
     optimizer = build_optimizer(model, config)
     scheduler = build_scheduler(config)
-    criterion = torch.nn.MSELoss()
+#     criterion = torch.nn.MSELoss()
 
     # logger
     run = build_wandb_logger(config)
@@ -117,18 +119,22 @@ def train(config):
             # add noise to the clean sequences
             noisy_seq = scheduler.add_noise(clean_data, noise, timesteps)
 
-            # predict the noise added by scheduler
-            noise_pred = model(noisy_seq, timesteps, return_dict=False)
-            loss = criterion(noise_pred, noise)
+            # predict the clean data added by scheduler
+            seq_pred = model(noisy_seq, timesteps, return_dict=False)
+
+#             loss = criterion(seq_pred, noise)
+            loss_per_sample = model.loss_function(seq_pred, clean_data, 'none')
+            loss = loss_per_sample.sum()
 
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
             # logs
-            train_loss_list.append(loss.mean().item())
+#             train_loss_list.append(loss.mean().item())
+            train_loss_list.append(loss_per_sample.mean().item())
             global_step += config.batch
-            wandb.log({"train_loss/batch": loss.item(), "lr": float(config.lr), "global_step": global_step})
+            wandb.log({"train_loss/batch": loss_per_sample.mean().item(), "lr": float(config.lr), "global_step": global_step})
 
         # end of one epoch (all data has been used to train model once)
         ## evalueation
@@ -144,10 +150,13 @@ def train(config):
                 ).long()
                 val_noisy_seq = scheduler.add_noise(clean_data, val_noise, val_timesteps)
 
-                val_noise_pred = model(val_noisy_seq, val_timesteps, return_dict=False)
-                val_loss = criterion(val_noise_pred, val_noise)
 
-                val_loss_list.append(val_loss.mean().item())
+                seq_pred = model(val_noisy_seq, val_timesteps, return_dict=False)
+#                 val_loss = criterion(val_noise_pred, val_noise)
+                val_loss_per_sample = model.loss_function(seq_pred, clean_data, 'none')
+                loss = val_loss_per_sample.sum()
+
+                val_loss_list.append(val_loss_per_sample.mean().item())
 
             # log epoch results
             train_loss = sum(train_loss_list) / len(train_loss_list)
@@ -155,16 +164,17 @@ def train(config):
             wandb.log({"train_loss/epoch": train_loss, "test_loss/epoch": val_loss, "epoch": epoch})
 
             # save the best model for now
-            if val_loss < best_val_loss:
+            if config.save_flag and val_loss < best_val_loss:
                 best_val_loss = val_loss
-                torch.save(model.state_dict(), os.path.join(config.save_path, TIME+f"_best_unet1dmodel.pt"))
+                torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_best_unet1dmodel.pt"))
         
         # model log
-        if epoch % config.save_model_epochs == 0 and epoch != 0:
+        if config.save_flag and epoch % config.save_model_epochs == 0 and epoch != 0:
             pt_file = os.path.join(config.save_path, TIME+f"_diffusion_unet_epoch_{epoch}.pt")
             torch.save(model.state_dict(), pt_file)
-            
-    torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_unet_model.pt"))
+
+    if config.save_flag:            
+        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_unet_model.pt"))
             
     # clean cuda memory
     del model
