@@ -1,35 +1,3 @@
-loader_cfg:
-  data_name: 'ohe_5utr_95_64to128.pt'
-  batch: 64
-  train_prop: 0.8
-  shuffle: true
-  seed: 2024
-
-logger_cfg:
-  save_flag: false
-  save_model_epochs: 10
-  save_path: '/save_models/5utr/'
-
-trainer_cfg:
-  epoch: 10
-  lr: [1e-3, 5e-3, 1e-4, 5e-4, 1e-5, 5e-5]
-  lr_warmup_steps: [500, 2000, 5000]
-  optimizer: "AdamW"
-
-model_cfg:
-  scheduler: ["DDPM", "DDIM"]
-  num_train_timesteps: [1000, 100]
-  input_length: 128
-  in_channels: 5
-  out_channels: 5
-  layers_per_block: [4, 6, 8]
-  block_out_channels: [[256, 256, 512, 512], [128, 128, 256, 256], [], []] 
-  down_block_types: ["DownBlock1D", "DownBlock1D", "AttnDownBlock1D", "DownBlock1D"]
-  up_block_types: ["UpBlock1D", "AttnUpBlock1D", "UpBlock1D", "UpBlock1D"]
-
-sweep_cfg:
-  run_cap: 100
-  
 program: 5utr_UNet1DModel_sweep.py
 name: 5utr_UNet1DModel_sweep
 description: "sweep for 5utr generation model with UNet1DModel as the architecture."

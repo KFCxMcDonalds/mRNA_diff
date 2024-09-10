@@ -1,3 +1,9 @@
+generate_cfg:
+  gen_seqs_path: "5utr/"
+  gen_model_path: "5utr/2024-08-27_14-46-46_final_unet_model.pt"
+  gen_num: 2048
+  gen_batch_size: 512
+
 loader_cfg:
   data_name: 'ohe_5utr_95_64to128.pt'
   batch: 64
@@ -8,7 +14,7 @@ loader_cfg:
 logger_cfg:
   save_flag: true
   save_model_epochs: 10 
-  save_path: '/save_models/5utr/diffusion/'
+  save_path: '/save_models/5utr/'
 
 trainer_cfg:
   epoch: 100 
@@ -26,3 +32,4 @@ model_cfg:
   block_out_channels: [256, 256, 512, 512]  # 4 blocks each side
   down_block_types: ["DownBlock1D", "DownBlock1D", "AttnDownBlock1D", "DownBlock1D"]
   up_block_types: ["UpBlock1D", "AttnUpBlock1D", "UpBlock1D", "UpBlock1D"]
+

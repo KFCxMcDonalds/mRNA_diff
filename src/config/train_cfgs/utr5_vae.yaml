@@ -1,0 +1,38 @@
+loader_cfg:
+  data_name: 'ohe_5utr_95_64to128.pt'
+  batch: 128
+  train_prop: 0.9
+  shuffle: true
+  seed: 2024
+
+logger_cfg:
+  save_flag: False
+  log_flag: False
+  save_model_epochs: 50 
+  save_path: '/save_models/5utr/vae/'
+
+trainer_cfg:
+  epoch: 1000
+  lr: 3e-5
+  lr_warmup_steps: 500
+  optimizer: "AdamW"
+
+# for max length 128
+model_cfg:
+  check_point: ""
+  in_channel: 5
+  seq2img_num_layers: 1
+  seq2img_img_channels: 64
+  in_width: 1
+  hidden_width: [4, 8, 16]
+  kld_weight: 0.5
+#   layer_per_block: 0  # resnet block
+
+# for max length 512
+# model_cfg:
+#   in_channel: 5
+#   seq2img_num_layers: 3
+#   seq2img_img_channels: 64
+#   in_width: 1
+#   hidden_width: [8, 16, 32]
+#   kld_weight: 1

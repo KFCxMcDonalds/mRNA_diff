@@ -25,6 +25,15 @@ class UNet1DWithSoftmax(nn.Module):
         return x
 
 class UNet1D(nn.Module):
+    """
+    Input shape: [Bx5x128]
+    Output shape: Same as input shape [Bx5x128]
+    
+    B: Batch size
+    5: Number of channels (one-hot encoded nucleotides)
+    128: Sequence length
+    """
+
     def __init__(self, config):
         super(UNet1D, self).__init__()
         self.unet = UNet1DModel(
@@ -49,5 +58,6 @@ class UNet1D(nn.Module):
         loss = F.cross_entropy(output_reshape,label_indices, reduction=reduction)
 
         return loss
+
 
 

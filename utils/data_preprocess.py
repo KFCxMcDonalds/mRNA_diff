@@ -37,16 +37,23 @@ def cleaner(input_fasta):
     print("sequences with nucleotides other than ATCG has been deleted.")
 
 
-def length_filter(min, max, input_fasta):
+def length_filter(min, max, input_fasta, type):
     output_fasta = input_fasta.split('.')[0] + "_" + str(min) + "to" + str(max) + ".fasta"
 
     with open(output_fasta, 'w') as output_handle:
         num_filtered_sequences = 0
         for record in SeqIO.parse(input_fasta, "fasta"):
-            if min <= len(record.seq) <= max:
+            seq = str(record.seq)
+            if len(seq) >= min:
+                if type == '5utr':
+                    if len(seq) > max:
+                        seq = seq[-max:]
+                elif type in ['3utr', 'cds']:
+                    if len(seq) > max:
+                        seq = seq[:max]
                 num_filtered_sequences += 1
                 header = f">{record.description}\n"
-                sequence = str(record.seq) + "\n"
+                sequence = seq + "\n"
                 output_handle.write(header)
                 output_handle.write(sequence)
 
@@ -115,18 +122,18 @@ if __name__ == "__main__":
     data_dir = os.path.dirname(root) + "/data/"
 
     # remove redundancy
-#     sims = [80, 90]
-#     for sim in sims:
-#         remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+".fasta", redundancy=sim)
+    sims = [95]
+    for sim in sims:
+        remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+"_test.fasta", redundancy=sim)
     
-    # sequences clean: unknown nucleotides except ATCG
-    cleaner(data_dir+ "5utr_95.fasta")
-
-    # length filter
-    length_filter(64, 128, data_dir+"5utr_95.fasta")
-
-    # onehot encoder
-    onehot_encoder(data_dir+"5utr_95_64to128.fasta")
+#     # sequences clean: unknown nucleotides except ATCG
+#     # cleaner(data_dir+ "5utr_95.fasta")
+# 
+#     # length filter
+#     length_filter(64, 256, data_dir+"5utr_95.fasta", type="5utr")
+# 
+#     # onehot encoder
+#     onehot_encoder(data_dir+"5utr_95_64to512.fasta")
     
 
 

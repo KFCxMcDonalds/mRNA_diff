@@ -12,6 +12,7 @@ from tqdm import tqdm
 import wandb
 
 from ..models.utr.unet import UNet1D
+from utils.tensor_helper import tensor2rna, write2fasta
 
 def build_dataloader(config):
     # load from pt file
@@ -134,7 +135,7 @@ def train(config):
 #             train_loss_list.append(loss.mean().item())
             train_loss_list.append(loss_per_sample.mean().item())
             global_step += config.batch
-            wandb.log({"train_loss/batch": loss_per_sample.mean().item(), "lr": float(config.lr), "global_step": global_step})
+            wandb.log({"train_loss/batch": loss_per_sample.mean().item(), "lr/batch": float(config.lr), "global_step": global_step})
 
         # end of one epoch (all data has been used to train model once)
         ## evalueation
@@ -183,14 +184,49 @@ def train(config):
     torch.cuda.empty_cache()
 
     print(">>> Training finished. >>>")
-        
 
 
+def batch_generate(config, scheduler, model):
+    # initialize noise
+    noise = torch.randn(config.current_gen_batch, config.in_channels, config.input_length, device=config.device)
+    progress_bar = tqdm(total=config.num_train_timesteps, desc='Generating batch', unit='step')
+
+    with torch.no_grad():
+        for t in reversed(range(config.num_train_timesteps)):
+            clean_seqs = model(noise, t)
+            noise = scheduler.step(clean_seqs, t, noise).prev_sample
+
+            progress_bar.update(1)
+    progress_bar.close()
+    return clean_seqs
 
 
+def generate(config):
+    TIME = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+    device = config.device
+    gen_batch = config.gen_batch_size
+    total_samples = config.gen_num
 
+    # load diffusion model
+    model = UNet1D(config).to(device)
+    state_dict = torch.load(config.gen_model_path, map_location=device)
+    model.load_state_dict(state_dict)
 
+    model.eval()    
+    scheduler = build_scheduler(config)
 
+    scheduler.set_timesteps(config.num_train_timesteps)
+    file = config.gen_seqs_path + f"{TIME}_unet1dmodel.fasta"
 
+    for i in range(total_samples // gen_batch):
+        print(f"=== generating batch {i+1} ===")
+        utr_onehot = batch_generate(config, scheduler, model)
+        utr5 = [tensor2rna(ele) for ele in utr_onehot]
+        write2fasta(utr5, file)
+    if total_samples % gen_batch != 0:
+        config.current_gen_batch = total_samples % gen_batch
+        utr_onehot = batch_generate(config, scheduler, model)
+        utr5 = [tensor2rna(ele) for ele in utr_onehot]
+        write2fasta(utr5, file)
 
-
+    print(">>> Generation finished. >>>")

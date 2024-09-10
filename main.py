@@ -3,10 +3,11 @@ import yaml
 
 from config import ConfigLoader
 import src.sessions.utr5_unet1dmodel as utr5_unet1dmodel
+import src.sessions.utr5_vae as utr5_vae
 
 def build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='utr5_unet1dmodel', help='model to train/sweep/infer')
+    parser.add_argument('--model', type=str, default='utr5_vae', help='model to train/sweep/infer')
     parser.add_argument('--oper', type=str, default='train', help='trian or sweep or inference.')
     
     return parser
