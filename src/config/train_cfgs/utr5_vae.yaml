@@ -1,6 +1,6 @@
 loader_cfg:
   data_path: '/data/ohe_5utr_95_64to256.pt'
-  batch: 128
+  batch: 64
   train_prop: 0.9
   shuffle: true
   seed: 2024
