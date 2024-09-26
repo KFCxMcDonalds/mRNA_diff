@@ -11,12 +11,12 @@ logger_cfg:
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
   logger_project: "mRNA_diff-5utr-vae-256"
-  logger_runname: "VAE-256"
-  logger_note: '256version-VAE'
+  logger_runname: "VAE-256-batch128"
+  logger_note: '256version-VAE batchsize = 128'
 
 trainer_cfg:
   epoch: 1000
-  lr: 0.0001
+  lr: 1.5e-4
   optimizer: "Adam"
 #  lr_warmup_steps: 500
 
