@@ -11,3 +11,5 @@ wandb
 jupyter_scripts/.ipynb_checkpoints
 save_models/5utr
 src/models/utr/.ipynb_checkpoints
+.vscode
+saved_models/5utr

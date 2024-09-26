@@ -9,7 +9,8 @@ import torch.optim as optim
 import wandb
 from tqdm import tqdm
 
-from src.models.utr.vae import VAE
+# from src.models.utr.vae import VAE
+from models.utr.vae import VAE
 from src.metrics.vae_metric import batch_accuracy
 from utils.beta_scheduler import StepBetaScheduler
 
@@ -47,10 +48,8 @@ def build_model(config):
 def build_optimizer(model, config): 
     if config.optimizer == 'AdamW':
         optimizer = optim.AdamW(model.parameters(), lr=float(config.lr))
-    if config.optimizer == 'Adam':
-        optimizer = optim.Adam(model.parameters(), lr=float(config.lr))
     else:
-        optimizer = optim.Adam(model.parameters(), lr=float(config.lr))
+        optimizer = optim.AdamW(model.parameters(), lr=float(config.lr))
         warnings.warn("not sopported optimizer, using AdamW instead.")
 
     print(f"=== optimizer build completed. ===")
@@ -59,21 +58,20 @@ def build_optimizer(model, config):
 
 def build_betaScheduler(config): 
     # for kl-divergence weight
-    return StepBetaScheduler(config.beta_flag, config.epoch, config.kld_weight)
+    return StepBetaScheduler(config.epoch, config.kld_weight)
 
 def build_wandb_logger(config, model):
     config_dict = config.__dict__
     wandb.require("core")
     run = wandb.init(
-        project = config.logger_project,
-        name = config.logger_runname,
-        notes = config.logger_note,
+        project = "5utr-Attn_VAE",
+        notes = config.log_note,
         config = config_dict,
     )
-#     wandb.watch(model, log='all', log_freq=100, log_graph=True)
-#     wandb.config.system = {
-#         "monitor": True
-#     }
+    wandb.watch(model, log='all', log_freq=100, log_graph=True)
+    wandb.config.system = {
+        "monitor": True
+    }
 
     wandb.define_metric("global_step")  # every batch
     wandb.define_metric("epoch")
@@ -88,7 +86,6 @@ def build_wandb_logger(config, model):
     wandb.define_metric("val_kld/epoch", step_metric="epoch")
     wandb.define_metric("val_ce/epoch", step_metric="epoch")
     wandb.define_metric("val_acc/epoch", step_metric="epoch")
-
     return run
 
 def train(config):
@@ -109,8 +106,11 @@ def train(config):
     global_step = 0
     best_val_loss = float('inf')
     for epoch in range(config.epoch):
+        print(f"=== training epochs: {epoch+1}/{config.epoch} ===")
         model.train()
         train_loss_list = []
+        train_kld_list = []
+        train_ce_list = []
         kld_weight = scheduler.step()
 
         for batch in tqdm(train_dataloader, desc=f"Training Epoch {epoch+1}/{config.epoch}", leave=False):
@@ -128,14 +128,16 @@ def train(config):
 
             # logs
             train_loss_list.append(loss.mean().item())
+            train_kld_list.append(kld.mean().item())
+            train_ce_list.append(ce.mean().item())
             global_step += config.batch
 
             if config.log_flag:
-                wandb.log({
-                    "train_loss/batch": loss.mean().item(), 
-                    "lr/batch": float(config.lr), 
-                    "global_step": global_step
-                })
+                wandb.log({"train_loss/batch": loss.mean().item(), 
+                        "train_kld/batch": kld.mean().item(), 
+                        "train_ce/batch": ce.mean().item(), 
+                        "lr/batch": float(config.lr), 
+                        "global_step": global_step})
 
         # end of one epoch (all data has been used to train model once)
         ## evalueation
@@ -161,6 +163,8 @@ def train(config):
             
         # log epoch results
         train_loss = sum(train_loss_list) / len(train_loss_list)
+        train_kld = sum(train_kld_list) / len(train_kld_list)
+        train_ce = sum(train_ce_list) / len(train_ce_list)
         val_loss = sum(val_loss_list) / len(val_loss_list)
         val_kld = sum(val_kld_list) / len(val_kld_list)
         val_ce = sum(val_ce_list) / len(val_ce_list)
@@ -168,6 +172,8 @@ def train(config):
 
         if config.log_flag:
             wandb.log({"train_loss/epoch": train_loss, 
+                    "train_kld/epoch": train_kld, 
+                    "train_ce/epoch": train_ce, 
                    "val_loss/epoch": val_loss, 
                    "val_kld/epoch": val_kld, 
                    "val_ce/epoch": val_ce, 
@@ -181,11 +187,11 @@ def train(config):
     
         # model log
         if config.save_flag and epoch % config.save_model_epochs == 0 and epoch != 0:
-            pt_file = os.path.join(config.save_path, TIME+f"_checkpoint_utr5vae_epoch{epoch}.pt")
+            pt_file = os.path.join(config.save_path, TIME+f"_utr5attnvae_epoch_{epoch}.pt")
             torch.save(model.state_dict(), pt_file)
     
     if config.save_flag:            
-        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_utr5vae.pt"))
+        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_utr5attnvae.pt"))
     
     del model
     del optimizer
@@ -193,5 +199,4 @@ def train(config):
     torch.cuda.empty_cache()
 
     print(">>> Training finished. >>>")
-    if config.log_flag:
-        run.finish()
+    run.finish()

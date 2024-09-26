@@ -1,4 +1,7 @@
+import torch
 import torch.nn as nn
+
+from utils.layer_helper import compute_layer_channels_exp, compute_layer_channels_linear
 
 class Seq2ImgEncoder(nn.Module):
     """
@@ -9,20 +12,30 @@ class Seq2ImgEncoder(nn.Module):
     output: [B, K, M, 1] represent: [batch_size, channel, height, width]
         unsqueeze the width dimension to 1, for Encoder_2d to process.
     """
-    def __init__(self, in_channel, target_channel, num_layers):
+    def __init__(self, in_channel, target_channel, num_feature_layers, num_layers):
         super().__init__()
 
         # ====FeatureLayerBlock====
         # only increase the channel to target_channel//2, not decrease the sequence length.
-        self.feature_layer = ConvBlock(in_channel, target_channel//2, kernel_size=9)
+        feature_channel_list = compute_layer_channels_linear(in_channel, target_channel//2, num_feature_layers)
+        feature_layers = []
+        for i, j in zip(feature_channel_list[:-1], feature_channel_list[1:]):
+            feature_layers.append(Conv1DBlock(i, j, kernel_sizes=[15]))  # can be multikernel
+        self.feature_layer = nn.Sequential(*feature_layers)
 
         # ====LayerBlock====
         # increase the channel to target_channel and maxpool the sequence length to in_length/2^num_layers
         # increase the channel layer by layer.
-        channel_list = compute_layer_channels(target_channel//2, target_channel, num_layers)
+        channel_list = compute_layer_channels_exp(target_channel//2, target_channel, num_layers, divide=2)
         layers = []
+        # maxpool at the third layer
+        layer_count = 0
         for i, j in zip(channel_list[:-1], channel_list[1:]):
-            layers.append(ConvBlock(i, j, kernel_size=3, sample_type='maxpool'))
+            if layer_count == 2:
+                layers.append(Conv1DBlock(i, j, kernel_sizes=[5], sample_type='maxpool'))
+            else:
+                layers.append(Conv1DBlock(i, j, kernel_sizes=[5]))
+            layer_count += 1
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -30,37 +43,34 @@ class Seq2ImgEncoder(nn.Module):
         x = self.layers(x)
         return x
 
-def compute_layer_channels(in_channel, trg_channel, num_layers):
-    """
-    compute the input and output channels after feature layers (Layer Block), details should look at the paper figure. 
-    """
-    current_channel = in_channel
-    channel_list = [current_channel]
-    step = (trg_channel - in_channel) / num_layers
-    for _ in range(num_layers):
-        current_channel += step
-        channel_list.append(int(current_channel))
-    return channel_list
-
-
 class Img2SeqDecoder(nn.Module):
     """
     input: [B, C, L]
     output: [B, 5, L]
     """
-    def __init__(self, in_channel, target_channel, num_layers):
+    def __init__(self, in_channel, target_channel, num_feature_layers, num_layers):
         super().__init__()
 
         # ====LayerBlock====
-        channel_list = compute_layer_channels(target_channel//2, target_channel, num_layers)
+        channel_list = compute_layer_channels_exp(target_channel//2, target_channel, num_layers, divide=2)
         channel_list.reverse()
         layers = []
+        count = 0
         for i, j in zip(channel_list[:-1], channel_list[1:]):
-            layers.append(ConvBlock(i, j, kernel_size=3, sample_type='upsample'))
+            if count == 2:
+                layers.append(Conv1DBlock(i, j, kernel_sizes=[5], sample_type='upsample'))
+            else:
+                layers.append(Conv1DBlock(i, j, kernel_sizes=[5]))
+            count += 1
         self.layers = nn.Sequential(*layers)
 
         # ====FeatureLayerBlock====
-        self.feature_layer = ConvBlock(target_channel//2, in_channel, kernel_size=9)
+        feature_channel_list = compute_layer_channels_linear(in_channel, target_channel//2, num_feature_layers)
+        feature_channel_list.reverse()
+        feature_layers = []
+        for i, j in zip(feature_channel_list[:-1], feature_channel_list[1:]):
+            feature_layers.append(Conv1DBlock(i, j, kernel_sizes=[15]))
+        self.feature_layer = nn.Sequential(*feature_layers)
 
     def forward(self, x):
         x = self.layers(x)
@@ -71,11 +81,12 @@ class Img2LatentEncoder(nn.Module):
     """
     take in 2D image tensor and output latent variable z
     input: [B, 1, L, C]
-    output: [B, W, L, C], where W = 2 * L
+    output: [B, W, L, C], where W = 2 * L, contained both mu and logvar
     """
-    def __init__(self, in_width, hidden_width):
+    def __init__(self, hidden_width):
         super().__init__()
         modules = []
+        in_width = 1
         for out_width in hidden_width:
             modules.append(
                 nn.Sequential(
@@ -111,60 +122,146 @@ class Latent2ImgDecoder(nn.Module):
                 )
             )
         self.layers = nn.Sequential(*modules)
+        # last conv2d layer: hidden_width[-1] -> 1, activation function is tanh
+        self.final_layer = nn.Sequential(
+            nn.ConvTranspose2d(hidden_width[-1], 1, kernel_size=3, stride=2, padding=1, output_padding=1),
+            nn.Tanh()
+        )
     
     def forward(self, x):
-        return self.layers(x)
+        x = self.layers(x)
+        x = self.final_layer(x)
+        return x
 
-
-class ConvBlock(nn.Module):
-    """
-    Convolution Block use maxPool + CNN to encoder DNA sequence to a two dimension vector.
-        1. reduce the length dimension of DNA sequence by half
-        2. use CNN to encode DNA sequence to increase the dimension of DNA sequence.
-    Args:
-        filter_list: [input channels, output channels]
-        kernel_size: default [5], is a list because it's multikernel block.
-        sample_type: 'maxpool' or 'upsample'
-    """
-    def __init__(self, in_channel, out_channel, kernel_size, sample_type=None):
+class Conv1DBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_sizes, sample_type=None):
         super().__init__()
         self.in_channel = in_channel
         self.out_channel = out_channel
-        self.kernel_size = kernel_size
+        self.kernel_sizes = kernel_sizes
         self.sample_type = sample_type
         self.transpose = False
         if self.sample_type == 'upsample':
             self.transpose = True
 
-        # conv layer
-        if self.transpose:
-            self.conv_layer = nn.ConvTranspose1d(in_channel, out_channel, kernel_size, padding=(kernel_size-1)//2)
-        else:
-            self.conv_layer = nn.Conv1d(in_channel, out_channel, kernel_size, padding=(kernel_size-1)//2)
-        # residual layer
-        self.residual_conv_layer = nn.Conv1d(out_channel, out_channel, 1)
-        # conv block
-        self.conv_block = nn.Sequential(
-            nn.GroupNorm(num_groups=in_channel, num_channels=in_channel),
-            nn.GELU(),
-            self.conv_layer
-        )
+        self.multikernel_conv = MultiKernelConv1DBlock(in_channel, out_channel, kernel_sizes, self.transpose)
+        self.conv_residual = MultiKernelConv1DBlock(out_channel, out_channel, [1], self.transpose)
+
+        if self.sample_type == 'maxpool':
+            self.sample_layer = nn.MaxPool1d(kernel_size=2, stride=2)
+        elif self.sample_type == 'upsample':
+            self.sample_layer = nn.Upsample(scale_factor=2, mode='nearest')
+        
+    def forward(self, x):
+        x = self.multikernel_conv(x)  # (out_channel, length)
+        # residual
+        add_ = x
+        x = self.conv_residual(x)
+        x = x + add_
 
         # maxpool or upsample
+        if self.sample_type:
+            x = self.sample_layer(x)
+
+        return x
+
+class MultiKernelConv1DBlock(nn.Module):
+    """
+    if kernel_sizes contains more than one kernel size, then use different kernel size to do conv.
+    if kernel_sizes contains only one kernel size, then use the normal conv1D.
+    """
+    def __init__(self, in_channel, out_channel, kernel_sizes, transpose=False):
+        super().__init__()
+        self.in_channel = in_channel
+        self.out_channel = out_channel
+        self.kernel_sizes = kernel_sizes
+        self.transpose = transpose
+
+        if in_channel > out_channel:
+            self.transpose = True
+
+        # decoder blcok
+        if self.transpose:
+            self.conv_layers = nn.ModuleList([
+                nn.ConvTranspose1d(in_channel, 
+                                   out_channel,
+                                   kernel_size=kernel_size,
+                                   padding=(kernel_size-1)//2)  # not change the length
+                                   for kernel_size in self.kernel_sizes])
+        else:  # encoder block
+            self.conv_layers = nn.ModuleList([
+                nn.Conv1d(in_channel, 
+                          out_channel,
+                          kernel_size=kernel_size,
+                          padding=(kernel_size-1)//2)  # not change the length
+                          for kernel_size in self.kernel_sizes])
+
+        self.conv_down = nn.Conv1d(len(self.kernel_sizes)*out_channel, out_channel, kernel_size=1)
+
+        self.norm = nn.GroupNorm(in_channel, in_channel)
+        self.gelu = nn.GELU()
+
+    def forward(self, x):
+        x = self.norm(x)
+        x = self.gelu(x)
+
+        x = torch.cat([conv(x) for conv in self.conv_layers], dim=1)  # channel to len(kernel_sizes)*out_channel
+        if len(self.kernel_sizes) > 1:
+            x = self.conv_down(x)  # reshape channel back to out_channel
+        return x
+    
+    def _init_weights(self, m):
+        pass
+
+
+class Conv1DAttnBlock(nn.Module):
+    def __init__(self, in_channel, out_channel, kernel_sizes, attn_embed_dim, sample_type=None):
+        super().__init__()
+        self.in_channel = in_channel
+        self.out_channel = out_channel
+        self.kernel_sizes = kernel_sizes
+        self.sample_type = sample_type
+        self.attn_embed_dim = attn_embed_dim
+        self.transpose = False
+        if self.sample_type == 'upsample':
+            self.transpose = True
+
+        self.multikernel_conv = MultiKernelConv1DBlock(in_channel, out_channel, kernel_sizes, self.transpose)
+        self.conv1 = nn.Conv1d(len(kernel_sizes)*out_channel, out_channel, kernel_size=1)
+
+        self.conv_up= nn.Conv1d(out_channel, attn_embed_dim, kernel_size=1)
+        self.attn = nn.MultiheadAttention(attn_embed_dim, num_heads=4)
+        self.conv_down = nn.Conv1d(attn_embed_dim, out_channel, kernel_size=1)
+
+        self.Norm = nn.GroupNorm(num_groups=out_channel, num_channels=out_channel)
+
         if self.sample_type == 'maxpool':
             self.sample_layer = nn.MaxPool1d(kernel_size=2, stride=2)
         elif self.sample_type == 'upsample':
             self.sample_layer = nn.Upsample(scale_factor=2, mode='nearest')
 
+        self.gelu = nn.GELU()
+        
     def forward(self, x):
-        x = self.conv_block(x)
-        add = x
-        x = self.residual_conv_layer(x)
-        x = x + add
+        x = self.multikernel_conv(x)  # (3*inchannel, length)
+        x = self.conv1(x)  # (outchannel, length)
 
-        if self.sample_type != None:
+        # attention
+        add_ = x
+        x = self.conv_up(x)
+#         x = self.gelu(x)
+        x = x.permute(2, 0, 1)
+        x = self.attn(x, x, x)[0]
+        x = x.permute(1, 2, 0)
+#         x = self.gelu(x)
+        x = self.conv_down(x)
+        x = x + add_
+
+        # maxpool or upsample
+        if self.sample_type:
             x = self.sample_layer(x)
-        return x 
 
-# TODO: multikernel
-# TODO: add residual connection in latent encoder/decoder
+        x = self.Norm(x)
+        return self.gelu(x)
+
+

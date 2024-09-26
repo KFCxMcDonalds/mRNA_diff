@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .sub_models.seq2img_models import Seq2ImgEncoder, Img2SeqDecoder, Img2LatentEncoder, Latent2ImgDecoder
+from .sub_models.seq2img_models_old import Seq2ImgEncoder, Img2SeqDecoder, Img2LatentEncoder, Latent2ImgDecoder
 
 class VAE(nn.Module):
     """
@@ -20,10 +20,10 @@ class VAE(nn.Module):
         # ============================
         # sequence to image
         # 1D Encoder: takes in sequence data and reformat representation to 2D representation.
-        self.Encoder_1d = Seq2ImgEncoder(self.config.in_channel, self.config.seq2img_img_channels, self.config.seq2img_num_feature_layers, self.config.seq2img_num_layers)
+        self.Encoder_1d = Seq2ImgEncoder(self.config.in_channel, self.config.seq2img_img_channels, self.config.seq2img_num_layers)
 
         # 2D Encoder: takes in 2D representation and output latent variable z
-        self.Encoder_2d = Img2LatentEncoder(self.config.hidden_width)
+        self.Encoder_2d = Img2LatentEncoder(self.config.in_width, self.config.hidden_width)
         
         self.latent_encoder = nn.Conv2d(self.config.hidden_width[-1], self.config.hidden_width[-1], kernel_size=1)
 
@@ -33,25 +33,30 @@ class VAE(nn.Module):
         self.latent_decoder = nn.Conv2d(self.config.hidden_width[-1]//2, self.config.hidden_width[-1], kernel_size=1)
         # 2D Decoder: takes in latent 2D representation and output sequence 2D representaion 
         self.config.hidden_width.reverse()
+        self.config.hidden_width.append(1)
         self.Decoder_2d = Latent2ImgDecoder(self.config.hidden_width)
         # 1D Decoder: takes in sequence 2D representation and output sequence 1D representation.
-        self.Decoder_1d = Img2SeqDecoder(self.config.in_channel, self.config.seq2img_img_channels, self.config.seq2img_num_feature_layers, self.config.seq2img_num_layers)
+        self.Decoder_1d = Img2SeqDecoder(self.config.in_channel, self.config.seq2img_img_channels, self.config.seq2img_num_layers)
 
+        # ============================
+        # ====== final layer =========
+        # ============================
+        self.tanh = nn.Tanh()
     
     def encoder(self, x):
         # 1d encoder input: [B, 5, L]
         x = self.Encoder_1d(x)
-        print("after encoder 1d:", x.shape)
-        # 1d encoder output: [B, C, L]
+        # print("after encoder 1d:", x.shape)
+        # 1d encoder output: [B, C, L], and C=L=128
 
         # 2d encoder input: [B, 1, L, C]
         x = x.view(-1, 1, x.shape[1], x.shape[2])
         z = self.Encoder_2d(x)
-        print("after encoder 2d:", z.shape)
+        # print("after encoder 2d:", z.shape)
         
         # intermediate
         z = self.latent_encoder(z)
-        print("after latent encoder:", z.shape)
+        # print("after latent encoder:", z.shape)
         # 2d encoder output: [B, W, L, C] = [B, ]
 
         # split z to mu and logvar
@@ -62,18 +67,20 @@ class VAE(nn.Module):
 
 
     def decoder(self, z):
-        # convert z to same shape as output of encoder2d, [B, W, L, C] -> [B, W*2, L, C] 
+        # convert z to same shape as output of encoder2d, which contains both mu and logvar
         z = self.latent_decoder(z)
-        print("after latent decoder:", z.shape)
+        # print("after latent decoder:", z.shape)
 
         # 2d decoder
         y  = self.Decoder_2d(z)
-        print("after decoder 2d:", y.shape)
+        # print("after decoder 2d:", y.shape)
+        y = self.tanh(y)
+        # print("after tanh:", y.shape)
 
         # 1d decoder
         y = y.squeeze(1).permute(0, 2, 1)  # to [B, C, L]
         y = self.Decoder_1d(y)
-        print("after decoder 1d:", y.shape)
+        # print("after decoder 1d:", y.shape)
 
         return y 
 
@@ -86,6 +93,9 @@ class VAE(nn.Module):
         mu, logvar = self.encoder(x)
         z = self.reparametrize(mu, logvar)
         return [self.decoder(z), mu, logvar]
+
+    def generate(self, x):
+        return self.forward(x)[0]
 
     def loss_function(self, x, x_recon, z_mean, z_logvar, kld_weight):
         # KL + CrossEntropy

@@ -7,8 +7,8 @@ import src.sessions.utr5_vae as utr5_vae
 
 def build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='utr5_vae', help='model to train/sweep/infer')
-    parser.add_argument('--oper', type=str, default='train', help='trian or sweep or inference.')
+    parser.add_argument('--model', type=str, default='utr5_vae', help='model to train/sweep/generate')
+    parser.add_argument('--oper', type=str, default='train', help='trian or sweep or generate.')
     
     return parser
 
@@ -26,17 +26,19 @@ if __name__ == "__main__":
 
     if args.oper == 'train':
         cfg_path = root + '/src/config/train_cfgs/'
+        cfg_file = cfg_path + args.model + '.yaml'
+        config = prepare_config(cfg_file, root)
+
         run = eval(args.model).train
     elif args.oper == 'sweep':
+        # TODO
         cfg_path = root + '/src/config/sweep_cfgs/'
-    elif args.oper == 'infer':
-        cfg_path = root + '/src/config/infer_cfgs/'
+    elif args.oper == 'generate':
+        #TODO
+        cfg_path = root + '/src/config/generate_cfgs/'
     else:
-        raise Exception("not supported operation, should be one of [train, sweep, infer]")
+        raise Exception("not supported operation, should be one of [train, sweep, generate]")
         
-    cfg_file = cfg_path + args.model + '.yaml'
-    config = prepare_config(cfg_file, root)
-
     run(config)
 
 
