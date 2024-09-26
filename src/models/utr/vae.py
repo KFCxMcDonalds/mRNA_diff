@@ -41,17 +41,17 @@ class VAE(nn.Module):
     def encoder(self, x):
         # 1d encoder input: [B, 5, L]
         x = self.Encoder_1d(x)
-        print("after encoder 1d:", x.shape)
+        #print("after encoder 1d:", x.shape)
         # 1d encoder output: [B, C, L]
 
         # 2d encoder input: [B, 1, L, C]
         x = x.view(-1, 1, x.shape[1], x.shape[2])
         z = self.Encoder_2d(x)
-        print("after encoder 2d:", z.shape)
+        #print("after encoder 2d:", z.shape)
         
         # intermediate
         z = self.latent_encoder(z)
-        print("after latent encoder:", z.shape)
+        #print("after latent encoder:", z.shape)
         # 2d encoder output: [B, W, L, C] = [B, ]
 
         # split z to mu and logvar
@@ -64,16 +64,16 @@ class VAE(nn.Module):
     def decoder(self, z):
         # convert z to same shape as output of encoder2d, [B, W, L, C] -> [B, W*2, L, C] 
         z = self.latent_decoder(z)
-        print("after latent decoder:", z.shape)
+        #print("after latent decoder:", z.shape)
 
         # 2d decoder
         y  = self.Decoder_2d(z)
-        print("after decoder 2d:", y.shape)
+        #print("after decoder 2d:", y.shape)
 
         # 1d decoder
         y = y.squeeze(1).permute(0, 2, 1)  # to [B, C, L]
         y = self.Decoder_1d(y)
-        print("after decoder 1d:", y.shape)
+        #print("after decoder 1d:", y.shape)
 
         return y 
 

@@ -3,7 +3,7 @@ loader_cfg:
   batch: 128
   train_prop: 0.9
   shuffle: true
-  seed: 42
+  seed: 2024
 
 logger_cfg:
   save_flag: True
@@ -16,7 +16,7 @@ logger_cfg:
 
 trainer_cfg:
   epoch: 1000
-  lr: 1.5e-4
+  lr: 0.0001
   optimizer: "Adam"
 #  lr_warmup_steps: 500
 
@@ -29,4 +29,5 @@ model_cfg:
   seq2img_img_channels: 128
   hidden_width: [2, 4, 8, 16]
   beta_flag: False
-  kld_weight: 0.00001
+  kld_weight: 0.000001
+  
