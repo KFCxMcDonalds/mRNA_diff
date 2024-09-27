@@ -65,12 +65,22 @@ def build_wandb_logger(config, model, TIME):
     config_dict = config.__dict__
     config_dict["TIME"] = TIME
     wandb.require("core")
-    run = wandb.init(
-        project = config.logger_project,
-        name = config.logger_runname,
-        notes = config.logger_note,
-        config = config_dict,
-    )
+
+    if config.resume_flag:
+        runid = config.resume_runid
+        run = wandb.init(
+            project = config.logger_project,
+            name = config.logger_runname,
+            resume='must',
+            id=runid
+        )
+    else:
+        run = wandb.init(
+            project = config.logger_project,
+            name = config.logger_runname,
+            notes = config.logger_note,
+            config = config_dict,
+        )
     wandb.watch(model, log='all', log_freq=1000, log_graph=True)
     wandb.config.system = {
         "monitor": True
@@ -94,10 +104,10 @@ def build_wandb_logger(config, model, TIME):
 
 def train(config):
     torch.manual_seed(config.seed)
-    if config.TIME is None:
-        TIME = str(datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S"))
+    if config.resume_flag:
+        TIME = config.resume_TIME
     else:
-        TIME = config.TIME
+        TIME = str(datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S"))
     device = config.device
 
     # components
@@ -106,12 +116,16 @@ def train(config):
     optimizer = build_optimizer(model, config)
     scheduler = build_betaScheduler(config)
 
-    if config.log_flag:
-        run = build_wandb_logger(config, model, TIME)
+    run = build_wandb_logger(config, model, TIME)
 
     global_step = 0
     best_val_loss = float('inf')
-    for epoch in range(config.epoch):
+    if config.resume_flag:
+        start_epoch = config.resume_epoch
+    else:
+        start_epoch = 0
+
+    for epoch in range(start_epoch, config.epoch):
         model.train()
         train_loss_list = []
         kld_weight = scheduler.step()
