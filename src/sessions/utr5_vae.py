@@ -61,8 +61,9 @@ def build_betaScheduler(config):
     # for kl-divergence weight
     return StepBetaScheduler(config.beta_flag, config.epoch, config.kld_weight)
 
-def build_wandb_logger(config, model):
+def build_wandb_logger(config, model, TIME):
     config_dict = config.__dict__
+    config_dict["TIME"] = TIME
     wandb.require("core")
     run = wandb.init(
         project = config.logger_project,
@@ -70,10 +71,10 @@ def build_wandb_logger(config, model):
         notes = config.logger_note,
         config = config_dict,
     )
-#     wandb.watch(model, log='all', log_freq=100, log_graph=True)
-#     wandb.config.system = {
-#         "monitor": True
-#     }
+    wandb.watch(model, log='all', log_freq=1000, log_graph=True)
+    wandb.config.system = {
+        "monitor": True
+    }
 
     wandb.define_metric("global_step")  # every batch
     wandb.define_metric("epoch")
@@ -93,8 +94,10 @@ def build_wandb_logger(config, model):
 
 def train(config):
     torch.manual_seed(config.seed)
-
-    TIME = str(datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S"))
+    if config.TIME is None:
+        TIME = str(datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S"))
+    else:
+        TIME = config.TIME
     device = config.device
 
     # components
@@ -104,7 +107,7 @@ def train(config):
     scheduler = build_betaScheduler(config)
 
     if config.log_flag:
-        run = build_wandb_logger(config, model)
+        run = build_wandb_logger(config, model, TIME)
 
     global_step = 0
     best_val_loss = float('inf')

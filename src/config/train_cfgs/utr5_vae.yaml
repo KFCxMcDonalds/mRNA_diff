@@ -7,12 +7,13 @@ loader_cfg:
 
 logger_cfg:
   save_flag: True
-  log_flag: True
+  log_flag: False
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
   logger_project: "mRNA_diff-5utr-vae-256"
   logger_runname: "VAE-256-batch128"
   logger_note: '256version-VAE batchsize = 128'
+  TIME: "2024-09-26_16-09-48"
 
 trainer_cfg:
   epoch: 1000
@@ -22,7 +23,7 @@ trainer_cfg:
 
 # for max length 256
 model_cfg:
-  check_point: ""
+  check_point: "2024-09-26_16-09-48_final_utr5vae.pt"
   in_channel: 5
   seq2img_num_layers: 4
   seq2img_num_feature_layers: 1
