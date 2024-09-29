@@ -1,21 +1,19 @@
 import time
 import os
-
-from loguru import logger
-from Bio import Entrez, SeqIO
+from Bio import Entrez
 
 # 设置Entrez的邮箱地址
 Entrez.email = "liwen.wu0821@outlook.com"
 
 # params
 mRNA_ids = []
-total_num = 37251
+total_num = 36304
 batch_size = total_num  # query number every batch
 start = 0
 search_term = "mRNA[Filter] AND 5'UTR[Feature Key]"
 # store path
-log_file_path = "../data/5utr_id_log.txt"
-id_file_path = "../data/5utr_ids.txt"
+log_file_path = "/home/liwenwu/files/mRNA_diff/data/raw_data/5utr_id_log.txt"
+id_file_path = "/home/liwenwu/files/mRNA_diff/data/raw_data/5utr_ids.txt"
 # set start param
 if os.path.exists(log_file_path):
     # restart = start(logged)
@@ -57,3 +55,18 @@ while True:
                 for new_id in new_ids:
                     id_file.write(new_id + "\n")
             existing_ids.update(new_ids)
+
+        start += batch_size
+
+        # log
+        with open(log_file_path, "a") as log_file:
+            log_file.write(f"start={start}\n")
+
+        time.sleep(1)
+
+    except Exception as e:
+        # if blocked
+        print(f"blocked! please restart.\n end at: {start}")
+        time.sleep(10)
+
+print(f"Total mRNA with 5'UTR IDs retrieved: {len(existing_ids)}")
