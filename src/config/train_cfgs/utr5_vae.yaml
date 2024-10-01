@@ -11,8 +11,8 @@ logger_cfg:
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
   logger_project: "mRNA_diff-5utr-vae-256"
-  logger_runname: "VAE-256-human only"
-  logger_note: '256version-VAE human only: 76301'
+  logger_runname: "VAE-maxpool-middle"
+  logger_note: '256version-VAE maxpool layer at middle of encoder, encode:1, decode:2'
   # resume run
   resume_flag: False
   resume_TIME: "2024-09-26_16-09-48"

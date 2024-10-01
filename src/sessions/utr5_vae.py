@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader, random_split, TensorDataset
 import torch.optim as optim
 import wandb
 from tqdm import tqdm
+from torchsummary import summary
 
 from src.models.utr.vae import VAE
 from src.metrics.vae_metric import batch_accuracy
@@ -113,10 +114,12 @@ def train(config):
     # components
     train_dataloader, val_dataloader = build_dataloader(config)
     model = build_model(config)
+    summary(model, input_size=(config.in_channel, 256))
     optimizer = build_optimizer(model, config)
     scheduler = build_betaScheduler(config)
 
-    run = build_wandb_logger(config, model, TIME)
+    if config.log_flag:
+        run = build_wandb_logger(config, model, TIME)
 
     global_step = 0
     best_val_loss = float('inf')

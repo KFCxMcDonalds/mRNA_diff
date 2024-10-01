@@ -153,14 +153,17 @@ class Conv1DBlock(nn.Module):
             self.sample_layer = nn.Upsample(scale_factor=2, mode='nearest')
         
     def forward(self, x):
+        # upsample
+        if self.sample_type == 'upsample':
+            x = self.sample_layer(x)
         x = self.multikernel_conv(x)  # (out_channel, length)
         # residual
         add_ = x
         x = self.conv_residual(x)
         x = x + add_
 
-        # maxpool or upsample
-        if self.sample_type:
+        # maxpool
+        if self.sample_type == 'maxpool':
             x = self.sample_layer(x)
 
         return x

@@ -98,5 +98,3 @@ class VAE(nn.Module):
 
         loss = kld_weight * kld_loss + ce
         return loss, kld_loss, ce
-
-
