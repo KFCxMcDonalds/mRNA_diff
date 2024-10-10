@@ -133,10 +133,10 @@ if __name__ == "__main__":
     # length filter
     minL = 64
     maxL = 256
-    length_filter(minL, maxL, data_dir+"5utr_utrdb2.fasta", type="5utr")
+#     length_filter(minL, maxL, data_dir+"5utr_utrdb2.fasta", type="5utr")
 
     # onehot encoder
-    onehot_encoder(f"{data_dir}5utr_utrdb2_{minL}to{maxL}.fasta")
+    onehot_encoder(f"{data_dir}5utr_95_{minL}to{maxL}_PRI.fasta")
     
 
 

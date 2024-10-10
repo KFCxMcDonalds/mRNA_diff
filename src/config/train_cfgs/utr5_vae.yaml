@@ -1,5 +1,5 @@
 loader_cfg:
-  data_path: '/data/ohe_5utr_95_64to256.pt'
+  data_path: '/data/ohe_5utr_95_64to256_PRI.pt'
   batch: 64
   train_prop: 0.9
   shuffle: true
@@ -11,14 +11,13 @@ logger_cfg:
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
   logger_project: "utr5-VAE-256"
-  logger_runname: "VAE-batch64-maxpool2_1-init"
+  logger_runname: "VAE-batch64-maxpool2_1-init-latent8-PRI"
   logger_note: ''
   # resume run
   resume_flag: False
   resume_TIME: ""
   resume_runid: ""
   resume_epoch: 0
-
 
 trainer_cfg:
   epoch: 2000
