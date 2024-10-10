@@ -10,25 +10,25 @@ logger_cfg:
   log_flag: True
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
-  logger_project: "mRNA_diff-5utr-vae-256"
-  logger_runname: "VAE-maxpool-middle"
-  logger_note: '256version-VAE maxpool layer at middle of encoder, encode:1, decode:2'
+  logger_project: "utr5-VAE-256"
+  logger_runname: "VAE-batch64-maxpool2_1-init"
+  logger_note: ''
   # resume run
   resume_flag: False
-  resume_TIME: "2024-09-26_16-09-48"
-  resume_runid: "3n8su226"
-  resume_epoch: 1000
+  resume_TIME: ""
+  resume_runid: ""
+  resume_epoch: 0
 
 
 trainer_cfg:
-  epoch: 1500
+  epoch: 2000
   lr: 1e-4
   optimizer: "Adam"
 #  lr_warmup_steps: 500
 
 # for max length 256
 model_cfg:
-  check_point: "/saved_models/5utr/vae/2024-09-26_16-09-48_final_utr5vae.pt"
+  check_point: ""
   in_channel: 5
   seq2img_num_layers: 4
   seq2img_num_feature_layers: 1

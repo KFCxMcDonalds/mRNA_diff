@@ -94,6 +94,8 @@ class VAE(nn.Module):
         kld_loss = kld.sum()
 
         # CrossEntropy: reconstruction loss
+        x_recon = x_recon.permute(0, 2, 1)
+        x = x.permute(0, 2, 1)
         ce = F.cross_entropy(x_recon.reshape(-1, 5), x.reshape(-1, 5), reduction='sum')
 
         loss = kld_weight * kld_loss + ce

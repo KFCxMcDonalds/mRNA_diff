@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import math
+from torch.nn.init import trunc_normal_
 
 from utils.layer_helper import compute_layer_channels_exp, compute_layer_channels_linear
 
@@ -57,7 +59,7 @@ class Img2SeqDecoder(nn.Module):
         layers = []
         count = 0
         for i, j in zip(channel_list[:-1], channel_list[1:]):
-            if count == 2:
+            if count == 1:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5], sample_type='upsample'))
             else:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5]))
@@ -126,6 +128,8 @@ class Latent2ImgDecoder(nn.Module):
         self.final_layer = nn.Sequential(
             nn.ConvTranspose2d(hidden_width[-1], 1, kernel_size=3, stride=2, padding=1, output_padding=1),
             nn.Tanh()
+#             nn.BatchNorm2d(1),
+#             nn.LeakyReLU()
         )
     
     def forward(self, x):
@@ -151,6 +155,8 @@ class Conv1DBlock(nn.Module):
             self.sample_layer = nn.MaxPool1d(kernel_size=2, stride=2)
         elif self.sample_type == 'upsample':
             self.sample_layer = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.dropout = nn.Dropout(0.1)
         
     def forward(self, x):
         # upsample
@@ -160,6 +166,7 @@ class Conv1DBlock(nn.Module):
         # residual
         add_ = x
         x = self.conv_residual(x)
+#         x = self.dropout(x)
         x = x + add_
 
         # maxpool
@@ -204,6 +211,8 @@ class MultiKernelConv1DBlock(nn.Module):
         self.norm = nn.GroupNorm(in_channel, in_channel)
         self.gelu = nn.GELU()
 
+        self.apply(self._init_weights)
+
     def forward(self, x):
         x = self.norm(x)
         x = self.gelu(x)
@@ -214,7 +223,34 @@ class MultiKernelConv1DBlock(nn.Module):
         return x
     
     def _init_weights(self, m):
-        pass
+        if isinstance(m, torch.nn.Linear):
+            trunc_normal_(m.weight, std=0.02)
+            if isinstance(m, torch.nn.Linear) and m.bias is not None:
+                torch.nn.init.constant_(m.bias, 0)
+        elif isinstance(m, torch.nn.LayerNorm):
+            torch.nn.init.constant_(m.bias, 0)
+            torch.nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, torch.nn.Conv2d):
+            fan_out = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+            fan_out //= m.groups
+            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                m.bias.data.zero_()
+        elif isinstance(m, torch.nn.Conv1d):
+            fan_out = m.kernel_size[0] * m.out_channels
+            fan_out //= m.groups
+            m.weight.data.normal_(0, math.sqrt(2.0 / fan_out))
+            if m.bias is not None:
+                m.bias.data.zero_()
+        elif isinstance(m, nn.GroupNorm):
+            nn.init.constant_(m.bias, 0)
+            nn.init.constant_(m.weight, 1.0)
+        elif isinstance(m, nn.Sequential):
+            for submodule in m.children():
+                self._init_weights(submodule)
+        elif isinstance(m, nn.ModuleList):
+            for submodule in m:
+                self._init_weights(submodule)
 
 
 class Conv1DAttnBlock(nn.Module):
