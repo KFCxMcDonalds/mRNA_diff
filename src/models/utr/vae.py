@@ -77,14 +77,14 @@ class VAE(nn.Module):
 
         return y 
 
-    def reparametrize(self, z_mean, z_logvar):
+    def reparameterize(self, z_mean, z_logvar):
         std = torch.exp(0.5 * z_logvar).to(self.config.device)
         eps = torch.randn_like(std).to(self.config.device)
         return z_mean + std * eps
     
     def forward(self, x):
         mu, logvar = self.encoder(x)
-        z = self.reparametrize(mu, logvar)
+        z = self.reparameterize(mu, logvar)
         return [self.decoder(z), mu, logvar]
 
     def loss_function(self, x, x_recon, z_mean, z_logvar, kld_weight):

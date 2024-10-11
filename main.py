@@ -2,12 +2,12 @@ import argparse, os
 import yaml
 
 from config import ConfigLoader
-import src.sessions.utr5_unet1dmodel as utr5_unet1dmodel
 import src.sessions.utr5_vae as utr5_vae
+import src.sessions.utr5_unet2d as utr5_unet2d
 
 def build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='utr5_vae', help='model to train/sweep/generate')
+    parser.add_argument('--model', type=str, default='utr5_unet2d', help='model to train/sweep/generate')
     parser.add_argument('--oper', type=str, default='train', help='trian or sweep or generate.')
     
     return parser

@@ -35,3 +35,4 @@ model_cfg:
   hidden_width: [2, 4, 8, 16]
   beta_flag: False
   kld_weight: 0.000001
+

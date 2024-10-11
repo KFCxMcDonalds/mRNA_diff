@@ -2,11 +2,11 @@ import torch
 
 class ConfigLoader():
     def __init__(self, cfg, root):
-        self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cuda:1' if torch.cuda.is_available() else 'cpu'
 
         for cfg_class in cfg.values():
             for attr, value in cfg_class.items():
-                if attr == 'data_path' or attr == 'save_path':
+                if attr == 'data_path' or attr == 'save_path' or attr == 'vae_path':
                     value = root + value
                 if attr == 'check_point':
                     if value != "":

@@ -2,6 +2,8 @@ import datetime
 import pytz
 import warnings
 import os
+import io
+from contextlib import redirect_stdout
 
 import torch
 from torch.utils.data import DataLoader, random_split, TensorDataset
@@ -114,12 +116,19 @@ def train(config):
     # components
     train_dataloader, val_dataloader = build_dataloader(config)
     model = build_model(config)
-    summary(model, input_size=(config.in_channel, 256))
+    # === log model summary ===
+    buffer = io.StringIO()
+    with redirect_stdout(buffer):  
+        summary(model, input_size=(config.in_channel, 256))
+    summary_str = buffer.getvalue()
+    print(summary_str)
+    # === end log model summary ===
     optimizer = build_optimizer(model, config)
     scheduler = build_betaScheduler(config)
 
     if config.log_flag:
         run = build_wandb_logger(config, model, TIME)
+        wandb.summary["model_summary"] = summary_str
 
     global_step = 0
     best_val_loss = float('inf')
@@ -197,15 +206,15 @@ def train(config):
         # save the best model
         if config.save_flag and val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_best_utr5vae.pt"))
+            torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_best_vae.pt"))
     
         # model log
         if config.save_flag and epoch % config.save_model_epochs == 0 and epoch != 0:
-            pt_file = os.path.join(config.save_path, TIME+f"_checkpoint_utr5vae_epoch{epoch}.pt")
+            pt_file = os.path.join(config.save_path, TIME+f"_checkpoint_vae_epoch{epoch}.pt")
             torch.save(model.state_dict(), pt_file)
     
     if config.save_flag:            
-        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_utr5vae.pt"))
+        torch.save(model.state_dict(), os.path.join(config.save_path, TIME+"_final_vae.pt"))
     
     del model
     del optimizer
