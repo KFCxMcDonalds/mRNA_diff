@@ -6,7 +6,7 @@ class ConfigLoader():
 
         for cfg_class in cfg.values():
             for attr, value in cfg_class.items():
-                if attr == 'data_path' or attr == 'save_path' or attr == 'vae_path':
+                if attr == 'data_path' or attr == 'save_path' or attr == 'vae_path' or attr == 'diffusion_path':
                     value = root + value
                 if attr == 'check_point':
                     if value != "":

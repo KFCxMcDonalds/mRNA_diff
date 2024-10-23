@@ -13,3 +13,6 @@ save_models/5utr
 src/models/utr/.ipynb_checkpoints
 .vscode
 saved_models/5utr
+generation/5utr
+gc_content_distribution_2048.png
+gc_content_distribution.png

@@ -1,6 +1,5 @@
 import torch
 
-
 def tensor2rna(tensor):
     # (channel, length) -> seq
     mapping = {

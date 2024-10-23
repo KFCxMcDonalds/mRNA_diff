@@ -18,6 +18,7 @@ import wandb
 from src.models.utr.unet2d import UNet2D
 from src.models.utr.vae import VAE
 from utils.tensor_helper import tensor2rna, write2fasta
+from src.models.utr.pipelines import DDPMUTRPipeline
 
 def build_dataloader(config):
     # load from pt file
@@ -47,6 +48,13 @@ def build_model(config):
     if config.check_point is not None:
         print(f"model loaded from {config.check_point}")
     print(f"Total number of parameters:{total_params}")
+    return model.to(config.device)
+
+def build_diffusion_model(config):
+    model = UNet2D(config)
+    model.load_state_dict(torch.load(config.diffusion_path, map_location=config.device))
+    print(f"=== diffusion model build completed. ===")
+    print(f"diffusion model loaded from {config.diffusion_path}")
     return model.to(config.device)
 
 def build_vae_model(config):
@@ -273,31 +281,36 @@ def batch_generate(config, scheduler, model):
 
 
 def generate(config):
-    TIME = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
-    device = config.device
-    gen_batch = config.gen_batch_size
-    total_samples = config.gen_num
+    TIME = str(datetime.datetime.now(pytz.timezone('Asia/Shanghai')).strftime("%Y-%m-%d_%H-%M-%S"))
+    batch_size = config.batch_size
+    total_samples = config.total_samples
 
-    # load diffusion model
-    model = UNet1D(config).to(device)
-    state_dict = torch.load(config.gen_model_path, map_location=device)
-    model.load_state_dict(state_dict)
+    # load models
+    vae = build_vae_model(config)
+    diffusion_model = build_diffusion_model(config)
+    vae.eval()
+    diffusion_model.eval()
 
-    model.eval()    
     scheduler = build_scheduler(config)
 
-    scheduler.set_timesteps(config.num_train_timesteps)
-    file = config.gen_seqs_path + f"{TIME}_unet1dmodel.fasta"
+    # define pipeline
+    pipe = DDPMUTRPipeline(unet = diffusion_model, scheduler = scheduler)
+    pipe = pipe.to(config.device)
 
-    for i in range(total_samples // gen_batch):
-        print(f"=== generating batch {i+1} ===")
-        utr_onehot = batch_generate(config, scheduler, model)
-        utr5 = [tensor2rna(ele) for ele in utr_onehot]
-        write2fasta(utr5, file)
-    if total_samples % gen_batch != 0:
-        config.current_gen_batch = total_samples % gen_batch
-        utr_onehot = batch_generate(config, scheduler, model)
-        utr5 = [tensor2rna(ele) for ele in utr_onehot]
-        write2fasta(utr5, file)
-
-    print(">>> Generation finished. >>>")
+    # generate in batches:
+    for i in tqdm(range(total_samples//batch_size)):
+        RNA_onehot = pipe(output_type = np.array, return_dict=False, batch_size=batch_size, vae=vae)
+        RNA_onehot = RNA_onehot[0]
+        print(RNA_onehot.shape)
+        rna = [tensor2rna(ele) for ele in RNA_onehot]
+        if config.save_flag:
+            write2fasta(rna, config.save_path)
+    # last batch
+    if total_samples%batch_size != 0:
+        batch_size = total_samples%batch_size
+        RNA_onehot = pipe(output_type = np.array, return_dict= False, batch_size=batch_size, vae=vae)
+        RNA_onehot = RNA_onehot[0]
+        rna = [tensor2rna(ele) for ele in RNA_onehot]
+        if config.save_flag:
+            write2fasta(rna, config.save_path)
+    print(f">>> Generate {total_samples} RNA sequecnes")

@@ -8,7 +8,7 @@ import src.sessions.utr5_unet2d as utr5_unet2d
 def build_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='utr5_unet2d', help='model to train/sweep/generate')
-    parser.add_argument('--oper', type=str, default='train', help='trian or sweep or generate.')
+    parser.add_argument('--oper', type=str, default='generate', help='trian or sweep or generate.')
     
     return parser
 
@@ -34,8 +34,10 @@ if __name__ == "__main__":
         # TODO
         cfg_path = root + '/src/config/sweep_cfgs/'
     elif args.oper == 'generate':
-        #TODO
         cfg_path = root + '/src/config/generate_cfgs/'
+        cfg_file = cfg_path + 'utr5_generate.yaml'
+        config = prepare_config(cfg_file, root)
+        run = eval(args.model).generate
     else:
         raise Exception("not supported operation, should be one of [train, sweep, generate]")
         
