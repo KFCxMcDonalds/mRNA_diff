@@ -1,5 +1,5 @@
 loader_cfg:
-  data_path: '/data/ohe_5utr_95_64to256_PRI.pt'
+  data_path: '/data/ohe_5utr_95_64to512.pt'
   batch: 64
   train_prop: 0.9
   shuffle: true
@@ -10,8 +10,8 @@ logger_cfg:
   log_flag: True
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
-  logger_project: "utr5-VAE-256"
-  logger_runname: "VAE-batch64-maxpool2_1-init-latent8-PRI"
+  logger_project: "utr5-VAE-512"
+  logger_runname: "VAE-batch64-init-16latent"
   logger_note: ''
   # resume run
   resume_flag: False
@@ -32,7 +32,7 @@ model_cfg:
   seq2img_num_layers: 4
   seq2img_num_feature_layers: 1
   seq2img_img_channels: 128
-  hidden_width: [2, 4, 8, 16]
+  hidden_width: [32, 16, 8]
   beta_flag: False
   kld_weight: 0.000001
 

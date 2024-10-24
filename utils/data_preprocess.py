@@ -71,14 +71,16 @@ def read_and_pad(sequences, max_length):
 
     return new_seqs
 
-def onehot_encoder(input_fasta):
+def onehot_encoder(input_fasta, max_length=None, save_file=None):
     # padding
     sequences = []
     for record in SeqIO.parse(input_fasta, "fasta"):
         seq = str(record.seq)
         sequences.append(seq)
 
-    max_length = max([len(s) for s in sequences])
+    if max_length is None:
+        max_length = max([len(s) for s in sequences])
+
     sequences = read_and_pad(sequences, max_length)
     print("end of padding")
 
@@ -112,7 +114,10 @@ def onehot_encoder(input_fasta):
     # save to file
     dir = os.path.dirname(input_fasta)
     filename = os.path.basename(input_fasta)
-    output_pt = dir + "/ohe_" + filename.split('.')[0] + ".pt"
+    if save_file:
+        output_pt = dir + save_file
+    else:
+        output_pt = dir + "/ohe_" + filename.split('.')[0] + ".pt"
     print(output_pt)
     torch.save(ohe_trans_tensor, output_pt)
 
@@ -132,11 +137,17 @@ if __name__ == "__main__":
 
     # length filter
     minL = 64
-    maxL = 256
+    maxL = 512
 #     length_filter(minL, maxL, data_dir+"5utr_utrdb2.fasta", type="5utr")
 
     # onehot encoder
-    onehot_encoder(f"{data_dir}5utr_95_{minL}to{maxL}_PRI.fasta")
+    # onehot_encoder(f"{data_dir}5utr_95_{minL}to{maxL}_PRI.fasta")
+
+    # add star tail
+    onehot_encoder(data_dir+"5utr_95_64to256.fasta", max_length=maxL, save_file="ohe_5utr_95_64to256_star512.pt")
+
+    
+
     
 
 

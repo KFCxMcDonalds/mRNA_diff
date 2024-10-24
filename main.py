@@ -7,8 +7,8 @@ import src.sessions.utr5_unet2d as utr5_unet2d
 
 def build_parser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type=str, default='utr5_unet2d', help='model to train/sweep/generate')
-    parser.add_argument('--oper', type=str, default='generate', help='trian or sweep or generate.')
+    parser.add_argument('--model', type=str, default='utr5_vae', help='model to train/sweep/generate')
+    parser.add_argument('--oper', type=str, default='train', help='trian or sweep or generate.')
     
     return parser
 

@@ -119,7 +119,7 @@ def train(config):
     # === log model summary ===
     buffer = io.StringIO()
     with redirect_stdout(buffer):  
-        summary(model, input_size=(config.in_channel, 256))
+        summary(model, input_size=(config.in_channel, 512), device='cuda')
     summary_str = buffer.getvalue()
     print(summary_str)
     # === end log model summary ===
