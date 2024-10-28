@@ -21,21 +21,22 @@ def remove_redundancy(input_fasta, output_fasta, redundancy):
     print(f"cd-hit redandancy removing completed. Saved to {output_fasta}")
 
 def cleaner(input_fasta):
+    count = 0
     with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
         for record in SeqIO.parse(input_fasta, "fasta"):
             seq = str(record.seq).upper()
             # delete sequences with unknown nucleotides 'N'
-            if 'N' not in seq:
+            if set(seq).issubset({'A', 'T', 'C', 'G'}):
+                count += 1
                 header = f">{record.description}\n"
                 sequence = seq + "\n"
                 temp_file.write(header)
                 temp_file.write(sequence)
-        
         temp_file_name = temp_file.name
     
     os.replace(temp_file_name, input_fasta)
     
-    print("sequences with nucleotides other than ATCG has been deleted.")
+    print(f"sequences with nucleotides other than ATCG has been deleted.\n{count} sequence left.")
 
 
 def length_filter(min, max, input_fasta, type):
@@ -58,7 +59,7 @@ def length_filter(min, max, input_fasta, type):
                 output_handle.write(header)
                 output_handle.write(sequence)
 
-    print(f"length filter completed. Saved to {output_fasta}\n{num_filtered_sequences} sequences left.")
+    print(f"length filter completed. Saved to {output_fasta}. {num_filtered_sequences} sequences left.")
 
 def read_and_pad(sequences, max_length):
     # will be called by onehot_encoder
@@ -121,30 +122,30 @@ def onehot_encoder(input_fasta, max_length=None, save_file=None):
     print(output_pt)
     torch.save(ohe_trans_tensor, output_pt)
 
-    print(f"onehot encoding completed. Saved to {output_pt}.\n{len(sequences)} sequences left.")
+    print(f"onehot encoding completed. Saved to {output_pt}. {len(sequences)} sequences left.")
 
 if __name__ == "__main__":
     root = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.dirname(root) + "/data/"
 
-#     # remove redundancy
-#     sims = [95]
-#     for sim in sims:
-#         remove_redundancy(data_dir+"5utr_full.fasta", data_dir+"5utr_"+str(sim)+".fasta", redundancy=sim)
-    
-#     # sequences clean: unknown nucleotides except ATCG
-#     cleaner(data_dir+ "5utr_95.fasta")
+    # remove redundancy
+    # sims = [95]
+    # for sim in sims:
+    #     remove_redundancy(data_dir+"5utr_homo.fasta", data_dir+"5utr_homo_"+str(sim)+".fasta", redundancy=sim)
+  
+    # sequences clean: unknown nucleotides except ATCG
+    cleaner(data_dir+ "5utr_noHomo_90.fasta")
 
     # length filter
     minL = 64
-    maxL = 512
-#     length_filter(minL, maxL, data_dir+"5utr_utrdb2.fasta", type="5utr")
+    maxL = 256
+    length_filter(minL, maxL, data_dir+"5utr_noHomo_90.fasta", type="5utr")
 
     # onehot encoder
-    # onehot_encoder(f"{data_dir}5utr_95_{minL}to{maxL}_PRI.fasta")
+    onehot_encoder(f"{data_dir}5utr_noHomo_90_{minL}to{maxL}.fasta")
 
-    # add star tail
-    onehot_encoder(data_dir+"5utr_95_64to256.fasta", max_length=maxL, save_file="ohe_5utr_95_64to256_star512.pt")
+#     # add star tail
+#     onehot_encoder(data_dir+"5utr_95_64to256.fasta", max_length=maxL, save_file="/ohe_5utr_95_64to256_star512.pt")
 
     
 

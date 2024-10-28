@@ -1,18 +1,18 @@
 loader_cfg:
-  data_path: '/data/ohe_5utr_95_64to256_PRI.pt'
+  data_path: '/data/ohe_5utr_95_64to256.pt'
   batch: 256
   train_prop: 0.9
   shuffle: true
   seed: 2024
 
 logger_cfg:
-  save_flag: True
-  log_flag: True
-  save_model_epochs: 10 
+  save_flag: False
+  log_flag: False
+  save_model_epochs: 100 
   save_path: '/saved_models/5utr/unet/'
   logger_project: "utr5-diffusion-256"
-  logger_runname: "unet2d-16latent-PRI"
-  logger_note: ''
+  logger_runname: "unet2d-16latent-256"
+  logger_note: 'trained with VAE model:vae-maxpool2_1-16latent-1500epochs'
   # resume run
   resume_flag: False
   resume_TIME: ""
@@ -20,18 +20,18 @@ logger_cfg:
   resume_epoch: 0
 
 trainer_cfg:
-  epoch: 1000 
+  epoch: 1500 
   lr: 5e-5
   optimizer: "Adam"
   lr_warmup_steps: 500
 
 vae_cfg:
-  vae_path: "/saved_models/5utr/vae/2024-10-10_21-39-12_best_utr5vae.pt"
+  vae_path: "/saved_models/5utr/vae/2024-10-26_22-19-03_checkpoint_vae_epoch1500.pt"
   in_channel: 5
   seq2img_num_layers: 4
   seq2img_num_feature_layers: 1
   seq2img_img_channels: 128
-  hidden_width: [8, 16, 32]
+  hidden_width: [8, 16, 32]  # [8, 16, 32] or [2, 4, 8, 16]
   beta_flag: False
   kld_weight: 0.000001
 
@@ -44,7 +44,7 @@ model_cfg:
   sample_size: 16  # 16 latent size / 8 latent size 
   in_channels: 16
   out_channels: 16
-  block_out_channels: [256, 256, 512, 512]  # 4 blocks each side
+  block_out_channels: [128, 128, 256, 256]  # 4 blocks each side
   down_block_types: ["DownBlock2D", "DownBlock2D", "AttnDownBlock2D", "DownBlock2D"]
   up_block_types: ["UpBlock2D", "AttnUpBlock2D", "UpBlock2D", "UpBlock2D"]
-  layers_per_block: 8
+  layers_per_block: 4

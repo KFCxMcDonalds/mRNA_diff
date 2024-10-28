@@ -65,7 +65,9 @@ def build_betaScheduler(config):
     return StepBetaScheduler(config.beta_flag, config.epoch, config.kld_weight)
 
 def build_wandb_logger(config, model, TIME):
+    # reverse list in config file: when building model, list configs are reversed.
     config_dict = config.__dict__
+    config.hidden_width.reverse()
     config_dict["TIME"] = TIME
     wandb.require("core")
 

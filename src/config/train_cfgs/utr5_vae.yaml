@@ -11,13 +11,13 @@ logger_cfg:
   save_model_epochs: 100 
   save_path: '/saved_models/5utr/vae/'
   logger_project: "utr5-VAE-512"
-  logger_runname: "VAE-batch64-init-16latent"
+  logger_runname: "VAE-maxpool13_02-16latent"
   logger_note: ''
   # resume run
   resume_flag: False
   resume_TIME: ""
   resume_runid: ""
-  resume_epoch: 0
+  resume_epoch: None
 
 trainer_cfg:
   epoch: 2000
@@ -25,14 +25,13 @@ trainer_cfg:
   optimizer: "Adam"
 #  lr_warmup_steps: 500
 
-# for max length 256
 model_cfg:
   check_point: ""
   in_channel: 5
   seq2img_num_layers: 4
   seq2img_num_feature_layers: 1
   seq2img_img_channels: 128
-  hidden_width: [32, 16, 8]
+  hidden_width: [8, 16, 32]  # [8, 16, 32] or [2, 4, 8, 16]
   beta_flag: False
   kld_weight: 0.000001
 

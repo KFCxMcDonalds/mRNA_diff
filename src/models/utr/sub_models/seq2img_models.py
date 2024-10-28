@@ -33,7 +33,7 @@ class Seq2ImgEncoder(nn.Module):
         # maxpool at the third layer
         layer_count = 0
         for i, j in zip(channel_list[:-1], channel_list[1:]):
-            if layer_count in [0, 2]:
+            if layer_count in [1, 3]:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5], sample_type='maxpool'))
             else:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5]))
@@ -59,7 +59,7 @@ class Img2SeqDecoder(nn.Module):
         layers = []
         count = 0
         for i, j in zip(channel_list[:-1], channel_list[1:]):
-            if count in [1, 3]:
+            if count in [0, 2]:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5], sample_type='upsample'))
             else:
                 layers.append(Conv1DBlock(i, j, kernel_sizes=[5]))
